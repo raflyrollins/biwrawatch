@@ -1,0 +1,220 @@
+@import 'tailwindcss';
+
+@source '../views';
+@source '../js';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+    --background: #fbf7f5;
+    --surface: #ffffff;
+    --surface-muted: #f5edea;
+    --surface-strong: #efe3de;
+    --foreground: #241018;
+    --foreground-muted: #6e5a63;
+    --foreground-subtle: #8c7780;
+    --border: #e8dad5;
+    --border-strong: #d8c4bd;
+    --brand: #a62e5a;
+    --brand-hover: #8e254c;
+    --brand-soft: #f6dde6;
+    --brand-foreground: #ffffff;
+    --accent: #8a6420;
+    --accent-soft: #f3e6c8;
+    --accent-foreground: #241a08;
+    --success: #2f6b4f;
+    --success-soft: #ddf0e5;
+    --warning: #9a6200;
+    --warning-soft: #f8e8c7;
+    --danger: #b3263b;
+    --danger-soft: #f8dde1;
+    --info: #315c8a;
+    --info-soft: #dde8f5;
+    --live: #2f6b4f;
+    --ring: #a62e5a;
+    --overlay: rgb(36 16 24 / 48%);
+    --shadow-color: 36 16 24;
+}
+
+[data-theme='dark'] {
+    --background: #120b10;
+    --surface: #1b1118;
+    --surface-muted: #241821;
+    --surface-strong: #2d1d27;
+    --foreground: #f6edf0;
+    --foreground-muted: #b9a6ae;
+    --foreground-subtle: #917d86;
+    --border: #3a2832;
+    --border-strong: #4c3541;
+    --brand: #b23a63;
+    --brand-hover: #c64a74;
+    --brand-soft: #3a1c29;
+    --brand-foreground: #ffffff;
+    --accent: #e8c77a;
+    --accent-soft: #3a2b13;
+    --accent-foreground: #241a08;
+    --success: #6fbf95;
+    --success-soft: #163326;
+    --warning: #e4b45c;
+    --warning-soft: #3a2b13;
+    --danger: #e06a7a;
+    --danger-soft: #3a1a20;
+    --info: #7fa9d6;
+    --info-soft: #182a3d;
+    --live: #6fbf95;
+    --ring: #e8c77a;
+    --overlay: rgb(0 0 0 / 64%);
+    --shadow-color: 0 0 0;
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-surface: var(--surface);
+    --color-surface-muted: var(--surface-muted);
+    --color-surface-strong: var(--surface-strong);
+    --color-foreground: var(--foreground);
+    --color-foreground-muted: var(--foreground-muted);
+    --color-foreground-subtle: var(--foreground-subtle);
+    --color-border: var(--border);
+    --color-border-strong: var(--border-strong);
+    --color-brand: var(--brand);
+    --color-brand-hover: var(--brand-hover);
+    --color-brand-soft: var(--brand-soft);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-accent: var(--accent);
+    --color-accent-soft: var(--accent-soft);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-success: var(--success);
+    --color-success-soft: var(--success-soft);
+    --color-warning: var(--warning);
+    --color-warning-soft: var(--warning-soft);
+    --color-danger: var(--danger);
+    --color-danger-soft: var(--danger-soft);
+    --color-info: var(--info);
+    --color-info-soft: var(--info-soft);
+    --color-live: var(--live);
+    --color-ring: var(--ring);
+    --color-overlay: var(--overlay);
+
+    --font-sans:
+        'Gabarito', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-display: 'Playfair Display', ui-serif, Georgia, serif;
+
+    --radius-control: 6px;
+    --radius-card: 10px;
+    --radius-panel: 14px;
+    --radius-pill: 999px;
+
+    --shadow-card:
+        0 1px 2px rgb(var(--shadow-color) / 4%),
+        0 8px 24px rgb(var(--shadow-color) / 6%);
+    --shadow-panel:
+        0 2px 4px rgb(var(--shadow-color) / 5%),
+        0 18px 48px rgb(var(--shadow-color) / 12%);
+}
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+        color-scheme: light;
+    }
+
+    html[data-theme='dark'] {
+        color-scheme: dark;
+    }
+
+    body {
+        @apply min-h-screen bg-background font-sans text-foreground antialiased;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+        @apply font-display text-balance;
+    }
+
+    p {
+        @apply text-pretty;
+    }
+
+    ::selection {
+        @apply bg-brand-soft text-brand;
+    }
+
+    :focus-visible {
+        @apply ring-2 ring-ring ring-offset-2 ring-offset-background outline-none;
+    }
+
+    button,
+    a,
+    input,
+    select,
+    textarea {
+        @apply outline-none;
+    }
+
+    button:not(:disabled),
+    [role='button']:not(:disabled) {
+        cursor: pointer;
+    }
+
+    input[type='number']::-webkit-inner-spin-button,
+    input[type='number']::-webkit-outer-spin-button {
+        margin: 0;
+        appearance: none;
+    }
+}
+
+@layer utilities {
+    .live-dot {
+        position: relative;
+        display: inline-block;
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 999px;
+        background: var(--live);
+    }
+
+    .live-dot::after {
+        position: absolute;
+        inset: -0.25rem;
+        content: '';
+        border: 1px solid var(--live);
+        border-radius: inherit;
+        animation: live-pulse 2s ease-out infinite;
+    }
+}
+
+@keyframes live-pulse {
+    0% {
+        opacity: 0.6;
+        transform: scale(0.75);
+    }
+    70%,
+    100% {
+        opacity: 0;
+        transform: scale(1.5);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .live-dot::after {
+        animation: none;
+    }
+}

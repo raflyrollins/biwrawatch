@@ -1,0 +1,42 @@
+<?php
+
+return [
+    'status' => [
+        'pending' => 'Menunggu',
+        'picked_up' => 'Dijemput',
+        'in_transit' => 'Dalam perjalanan',
+        'customs' => 'Proses bea cukai',
+        'out_for_delivery' => 'Menuju alamat',
+        'delivered' => 'Terkirim',
+        'exception' => 'Kendala',
+        'returned' => 'Dikembalikan',
+        'cancelled' => 'Dibatalkan',
+    ],
+    'labels' => [
+        'tracking_number' => 'Nomor tracking',
+        'recipient_name' => 'Nama penerima',
+        'recipient_phone' => 'Nomor telepon penerima',
+        'recipient_address' => 'Alamat penerima',
+        'destination_city' => 'Kota tujuan',
+        'destination_country' => 'Negara tujuan',
+        'status' => 'Status',
+        'estimated_delivery_at' => 'Estimasi tiba',
+        'internal_notes' => 'Catatan internal',
+        'last_status_at' => 'Pembaruan terakhir',
+        'created_at' => 'Dibuat',
+        'updated_at' => 'Diperbarui',
+        'location' => 'Lokasi',
+        'note' => 'Catatan',
+        'occurred_at' => 'Waktu kejadian',
+        'is_public' => 'Tampilkan ke publik',
+        'provider' => 'Kurir',
+        'provider_tracking_number' => 'Nomor tracking kurir',
+        'is_primary' => 'Jadikan tracking utama',
+        'trackings' => 'Riwayat tracking',
+        'events' => 'Riwayat status',
+    ],
+    'timeline' => [
+        'title' => 'Perjalanan paket',
+        'empty' => 'Belum ada pembaruan status.',
+    ],
+];
