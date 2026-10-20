@@ -63,27 +63,33 @@ function applyTheme(theme: ResolvedTheme): void {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-    const [mode, setModeState] = useState<ThemeMode>(readStoredMode);
-    const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
-        resolveTheme(readStoredMode()),
-    );
+    const [mode, setModeState] = useState<ThemeMode>('system');
+    const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('light');
 
-    const setMode = useCallback((nextMode: ThemeMode) => {
+    const applyMode = useCallback((nextMode: ThemeMode) => {
+        const theme = resolveTheme(nextMode);
+
         setModeState(nextMode);
-
-        try {
-            window.localStorage.setItem(STORAGE_KEY, nextMode);
-        } catch {
-            // Storage can be unavailable in private browsing contexts.
-        }
-    }, []);
-
-    useEffect(() => {
-        const theme = resolveTheme(mode);
-
         setResolvedTheme(theme);
         applyTheme(theme);
-    }, [mode]);
+    }, []);
+
+    const setMode = useCallback(
+        (nextMode: ThemeMode) => {
+            applyMode(nextMode);
+
+            try {
+                window.localStorage.setItem(STORAGE_KEY, nextMode);
+            } catch {
+                // Storage can be unavailable in private browsing contexts.
+            }
+        },
+        [applyMode],
+    );
+
+    useEffect(() => {
+        applyMode(readStoredMode());
+    }, [applyMode]);
 
     useEffect(() => {
         if (mode !== 'system') {
@@ -108,13 +114,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                 return;
             }
 
-            setModeState(event.newValue);
+            applyMode(event.newValue);
         };
 
         window.addEventListener('storage', handleStorage);
 
         return () => window.removeEventListener('storage', handleStorage);
-    }, []);
+    }, [applyMode]);
 
     const value = useMemo(
         () => ({ mode, resolvedTheme, setMode }),

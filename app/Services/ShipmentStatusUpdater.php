@@ -69,4 +69,48 @@ class ShipmentStatusUpdater
             'event' => $event,
         ];
     }
+
+    public function deleteEvent(Shipment $shipment, ShipmentEvent $event): Shipment
+    {
+        $updatedShipment = DB::transaction(function () use ($shipment, $event): Shipment {
+            $locked = Shipment::query()
+                ->whereKey($shipment->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $event->delete();
+
+            $events = ShipmentEvent::query()->where('shipment_id', $locked->id);
+            $latest = (clone $events)
+                ->orderByDesc('occurred_at')
+                ->orderByDesc('id')
+                ->first();
+
+            $shippedAt = (clone $events)
+                ->whereIn('status', [
+                    ShipmentStatus::PickedUp->value,
+                    ShipmentStatus::InTransit->value,
+                    ShipmentStatus::Customs->value,
+                    ShipmentStatus::OutForDelivery->value,
+                    ShipmentStatus::Delivered->value,
+                ])
+                ->min('occurred_at');
+
+            $deliveredAt = (clone $events)
+                ->where('status', ShipmentStatus::Delivered->value)
+                ->max('occurred_at');
+
+            $locked->status = $latest->status ?? ShipmentStatus::Pending;
+            $locked->last_status_at = $latest?->occurred_at;
+            $locked->shipped_at = $shippedAt !== null ? Carbon::parse((string) $shippedAt) : null;
+            $locked->delivered_at = $deliveredAt !== null ? Carbon::parse((string) $deliveredAt) : null;
+            $locked->save();
+
+            return $locked;
+        });
+
+        event(new ShipmentStatusUpdated($updatedShipment));
+
+        return $updatedShipment;
+    }
 }

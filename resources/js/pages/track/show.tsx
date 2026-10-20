@@ -1,14 +1,24 @@
 import type { ReactNode } from 'react';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { useEcho } from '@laravel/echo-react';
+import {
+    Head,
+    router,
+    useForm,
+    usePage,
+    usePoll,
+    WhenMounted,
+} from '@inertiajs/react';
+import { useConnectionStatus, useEcho } from '@laravel/echo-react';
 import {
     ClockIcon,
     ExternalLinkIcon,
     MapPinIcon,
     PackageIcon,
+    RefreshIcon,
     TruckIcon,
     UserIcon,
 } from '@/components/icons';
+import { ShipmentProgress } from '@/components/shipment-progress';
+import { ShipmentTimeline } from '@/components/shipment-timeline';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -20,6 +30,7 @@ import type { ShipmentDetail } from '@/types/models';
 
 type Site = {
     whatsapp_url: string | null;
+    tracking_refresh_seconds?: number;
 };
 
 type Props = {
@@ -37,16 +48,17 @@ export default function TrackShow({
     const page = usePage();
     const site = page.props.site as Site | undefined;
     const form = useForm({ phone: '' });
-
-    useEcho(
-        shipment ? `tracking.${shipment.uuid}` : 'tracking.none',
-        'ShipmentStatusUpdated',
-        () => {
-            router.reload({ only: ['shipment'] });
-        },
-        [shipment?.uuid],
-        'public',
+    const refreshSeconds = site?.tracking_refresh_seconds ?? 15;
+    const terminalStatus = ['delivered', 'returned', 'cancelled'].includes(
+        shipment?.status.value ?? '',
     );
+
+    const refreshShipment = () => {
+        router.reload({
+            only: ['shipment'],
+            showProgress: false,
+        });
+    };
 
     return (
         <>
@@ -68,7 +80,34 @@ export default function TrackShow({
                         </p>
                     </div>
                     {shipment ? (
-                        <StatusBadge status={shipment.status.value} />
+                        <div className="flex flex-col items-start gap-2 sm:items-end">
+                            <StatusBadge status={shipment.status.value} />
+                            <div className="flex items-center gap-2 text-[11px] text-foreground-subtle">
+                                <WhenMounted
+                                    fallback={
+                                        <TrackingIndicator
+                                            isLive={false}
+                                            seconds={refreshSeconds}
+                                        />
+                                    }
+                                >
+                                    <TrackingConnection
+                                        shipmentUuid={shipment.uuid}
+                                        refreshSeconds={refreshSeconds}
+                                        terminalStatus={terminalStatus}
+                                    />
+                                </WhenMounted>
+                                <button
+                                    type="button"
+                                    onClick={refreshShipment}
+                                    aria-label={t('ui.trackPage.refresh')}
+                                    title={t('ui.trackPage.refresh')}
+                                    className="inline-flex size-6 items-center justify-center rounded-pill text-foreground-subtle hover:bg-surface-muted hover:text-brand"
+                                >
+                                    <RefreshIcon className="size-3.5" />
+                                </button>
+                            </div>
+                        </div>
                     ) : null}
                 </div>
 
@@ -135,172 +174,230 @@ export default function TrackShow({
                         </p>
                     </Card>
                 ) : (
-                    <div className="mt-10 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-                        <div className="flex flex-col gap-6">
-                            <Card className="p-6">
-                                <div className="flex items-start justify-between gap-4">
-                                    <div>
-                                        <p className="text-[10px] font-semibold tracking-[0.18em] text-foreground-subtle uppercase">
-                                            {t('ui.trackPage.status')}
-                                        </p>
-                                        <p className="mt-2 font-display text-3xl text-foreground">
-                                            {shipment.status.label}
-                                        </p>
+                    <div className="mt-10 flex flex-col gap-6">
+                        <ShipmentProgress shipment={shipment} />
+
+                        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                            <div className="flex flex-col gap-6">
+                                <Card className="p-6">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <p className="text-[10px] font-semibold tracking-[0.18em] text-foreground-subtle uppercase">
+                                                {t('ui.trackPage.status')}
+                                            </p>
+                                            <p className="mt-2 font-display text-3xl text-foreground">
+                                                {shipment.status.label}
+                                            </p>
+                                        </div>
+                                        <StatusBadge
+                                            status={shipment.status.value}
+                                        />
                                     </div>
-                                    <StatusBadge
-                                        status={shipment.status.value}
-                                    />
-                                </div>
 
-                                <div className="mt-6 grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
-                                    <Info
-                                        icon={UserIcon}
-                                        label={t('ui.trackPage.recipient')}
-                                        value={shipment.recipient_name}
-                                    />
-                                    <Info
-                                        icon={MapPinIcon}
-                                        label={t('ui.trackPage.destination')}
-                                        value={`${shipment.destination_city}, ${shipment.destination_country}`}
-                                    />
-                                    <Info
-                                        icon={ClockIcon}
-                                        label={t('ui.trackPage.estimated')}
-                                        value={
-                                            shipment.estimated_delivery_at
-                                                ? formatDate(
-                                                      shipment.estimated_delivery_at,
-                                                  )
-                                                : '-'
-                                        }
-                                    />
-                                    <Info
-                                        icon={PackageIcon}
-                                        label={t('ui.trackPage.lastUpdate')}
-                                        value={
-                                            shipment.last_status_at
-                                                ? formatDateTime(
-                                                      shipment.last_status_at,
-                                                  )
-                                                : '-'
-                                        }
-                                    />
-                                </div>
-                            </Card>
+                                    <div className="mt-6 grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
+                                        <Info
+                                            icon={UserIcon}
+                                            label={t('ui.trackPage.recipient')}
+                                            value={shipment.recipient_name}
+                                        />
+                                        <Info
+                                            icon={MapPinIcon}
+                                            label={t(
+                                                'ui.trackPage.destination',
+                                            )}
+                                            value={`${shipment.destination_city}, ${shipment.destination_country}`}
+                                        />
+                                        <Info
+                                            icon={ClockIcon}
+                                            label={t('ui.trackPage.estimated')}
+                                            value={
+                                                shipment.estimated_delivery_at
+                                                    ? formatDate(
+                                                          shipment.estimated_delivery_at,
+                                                      )
+                                                    : '-'
+                                            }
+                                        />
+                                        <Info
+                                            icon={PackageIcon}
+                                            label={t('ui.trackPage.lastUpdate')}
+                                            value={
+                                                shipment.last_status_at
+                                                    ? formatDateTime(
+                                                          shipment.last_status_at,
+                                                      )
+                                                    : '-'
+                                            }
+                                        />
+                                    </div>
+                                </Card>
+                            </div>
 
-                            <Card className="p-6">
-                                <h2 className="font-display text-2xl text-foreground">
-                                    {t('ui.trackPage.timeline')}
-                                </h2>
-
-                                {shipment.events.length > 0 ? (
-                                    <ol className="mt-5 flex flex-col">
-                                        {shipment.events.map((event, index) => (
-                                            <li
-                                                key={event.id}
-                                                className="relative flex gap-4 pb-6 last:pb-0"
+                            <div className="flex flex-col gap-6">
+                                <Card className="p-6">
+                                    <h2 className="font-display text-2xl text-foreground">
+                                        {t('ui.trackPage.courierTracking')}
+                                    </h2>
+                                    <div className="mt-4 flex flex-col gap-3">
+                                        {shipment.trackings.map((tracking) => (
+                                            <div
+                                                key={tracking.id}
+                                                className="rounded-card border border-border p-4"
                                             >
-                                                {index <
-                                                shipment.events.length - 1 ? (
-                                                    <span className="absolute top-4 left-[7px] h-full w-px bg-border" />
-                                                ) : null}
-                                                <span className="relative mt-1.5 size-3.5 shrink-0 rounded-pill border-2 border-surface bg-brand" />
-                                                <div className="min-w-0">
+                                                <div className="flex items-center justify-between gap-2">
                                                     <p className="text-sm font-semibold text-foreground">
-                                                        {event.status.label}
+                                                        {tracking.provider_name}
                                                     </p>
-                                                    <p className="mt-0.5 text-xs text-foreground-subtle">
-                                                        {formatDateTime(
-                                                            event.occurred_at,
-                                                        )}
-                                                        {event.location
-                                                            ? ` · ${event.location}`
-                                                            : ''}
-                                                    </p>
-                                                    {event.note ? (
-                                                        <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
-                                                            {event.note}
-                                                        </p>
+                                                    {tracking.is_primary ? (
+                                                        <span className="text-[10px] font-semibold tracking-wide text-brand uppercase">
+                                                            {t(
+                                                                'ui.trackPage.primary',
+                                                            )}
+                                                        </span>
                                                     ) : null}
                                                 </div>
-                                            </li>
-                                        ))}
-                                    </ol>
-                                ) : (
-                                    <p className="mt-4 text-sm text-foreground-muted">
-                                        {t('ui.trackPage.timelineEmpty')}
-                                    </p>
-                                )}
-                            </Card>
-                        </div>
-
-                        <div className="flex flex-col gap-6">
-                            <Card className="p-6">
-                                <h2 className="font-display text-2xl text-foreground">
-                                    {t('ui.trackPage.courierTracking')}
-                                </h2>
-                                <div className="mt-4 flex flex-col gap-3">
-                                    {shipment.trackings.map((tracking) => (
-                                        <div
-                                            key={tracking.id}
-                                            className="rounded-card border border-border p-4"
-                                        >
-                                            <div className="flex items-center justify-between gap-2">
-                                                <p className="text-sm font-semibold text-foreground">
-                                                    {tracking.provider_name}
+                                                <p className="mt-1 font-mono text-sm text-foreground-muted">
+                                                    {tracking.tracking_number}
                                                 </p>
-                                                {tracking.is_primary ? (
-                                                    <span className="text-[10px] font-semibold tracking-wide text-brand uppercase">
+                                                {tracking.tracking_url ? (
+                                                    <a
+                                                        href={
+                                                            tracking.tracking_url
+                                                        }
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand underline-offset-4 hover:underline"
+                                                    >
                                                         {t(
-                                                            'ui.trackPage.primary',
+                                                            'ui.trackPage.openCourier',
                                                         )}
-                                                    </span>
+                                                        <ExternalLinkIcon className="size-3.5" />
+                                                    </a>
                                                 ) : null}
                                             </div>
-                                            <p className="mt-1 font-mono text-sm text-foreground-muted">
-                                                {tracking.tracking_number}
-                                            </p>
-                                            {tracking.tracking_url ? (
-                                                <a
-                                                    href={tracking.tracking_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand underline-offset-4 hover:underline"
-                                                >
-                                                    {t(
-                                                        'ui.trackPage.openCourier',
-                                                    )}
-                                                    <ExternalLinkIcon className="size-3.5" />
-                                                </a>
-                                            ) : null}
-                                        </div>
-                                    ))}
-                                </div>
-                            </Card>
+                                        ))}
+                                    </div>
+                                </Card>
 
-                            <Card className="p-6">
-                                <TruckIcon className="size-5 text-brand" />
-                                <h2 className="mt-3 font-display text-2xl text-foreground">
-                                    {t('ui.trackPage.help')}
-                                </h2>
-                                <p className="mt-2 text-sm text-foreground-muted">
-                                    {t('ui.trackPage.helpText')}
-                                </p>
-                                {site?.whatsapp_url ? (
-                                    <a
-                                        href={site.whatsapp_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="mt-5 inline-flex h-10 items-center gap-2 rounded-control bg-brand px-4 text-sm font-semibold text-brand-foreground hover:bg-brand-hover"
-                                    >
-                                        {t('ui.common.contactWhatsapp')}
-                                    </a>
-                                ) : null}
-                            </Card>
+                                <Card className="p-6">
+                                    <TruckIcon className="size-5 text-brand" />
+                                    <h2 className="mt-3 font-display text-2xl text-foreground">
+                                        {t('ui.trackPage.help')}
+                                    </h2>
+                                    <p className="mt-2 text-sm text-foreground-muted">
+                                        {t('ui.trackPage.helpText')}
+                                    </p>
+                                    {site?.whatsapp_url ? (
+                                        <a
+                                            href={site.whatsapp_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="mt-5 inline-flex h-10 items-center gap-2 rounded-control bg-brand px-4 text-sm font-semibold text-brand-foreground hover:bg-brand-hover"
+                                        >
+                                            {t('ui.common.contactWhatsapp')}
+                                        </a>
+                                    ) : null}
+                                </Card>
+                            </div>
                         </div>
+
+                        <Card className="p-6">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h2 className="font-display text-2xl text-foreground">
+                                        {t('ui.trackPage.timeline')}
+                                    </h2>
+                                    <p className="mt-1 text-xs text-foreground-subtle">
+                                        {t('ui.trackPage.lastUpdate')}:{' '}
+                                        {shipment.last_status_at
+                                            ? formatDateTime(
+                                                  shipment.last_status_at,
+                                              )
+                                            : '-'}
+                                    </p>
+                                </div>
+                                <span className="rounded-pill bg-surface-muted px-3 py-1 text-xs font-semibold text-foreground-muted">
+                                    {t('ui.trackPage.updateCount', {
+                                        count: shipment.events.length,
+                                    })}
+                                </span>
+                            </div>
+
+                            <div className="mt-4">
+                                <ShipmentTimeline
+                                    events={shipment.events}
+                                    emptyLabel={t('ui.trackPage.timelineEmpty')}
+                                />
+                            </div>
+                        </Card>
                     </div>
                 )}
             </section>
+        </>
+    );
+}
+
+function TrackingConnection({
+    shipmentUuid,
+    refreshSeconds,
+    terminalStatus,
+}: {
+    shipmentUuid: string;
+    refreshSeconds: number;
+    terminalStatus: boolean;
+}) {
+    const connectionStatus = useConnectionStatus();
+    const isLive = connectionStatus === 'connected';
+
+    const refreshShipment = () => {
+        router.reload({
+            only: ['shipment'],
+            showProgress: false,
+        });
+    };
+
+    useEcho(
+        `tracking.${shipmentUuid}`,
+        '.ShipmentStatusUpdated',
+        refreshShipment,
+        [shipmentUuid],
+        'public',
+    );
+
+    usePoll(
+        refreshSeconds * 1000,
+        {
+            only: ['shipment'],
+            showProgress: false,
+        },
+        {
+            background: 'pause',
+            autoStart: !terminalStatus,
+        },
+    );
+
+    return <TrackingIndicator isLive={isLive} seconds={refreshSeconds} />;
+}
+
+function TrackingIndicator({
+    isLive,
+    seconds,
+}: {
+    isLive: boolean;
+    seconds: number;
+}) {
+    const { t } = useTranslation();
+
+    return (
+        <>
+            <span
+                className={`size-1.5 rounded-pill ${isLive ? 'animate-pulse bg-success' : 'bg-warning'}`}
+            />
+            <span>
+                {isLive
+                    ? t('ui.trackPage.live')
+                    : t('ui.trackPage.autoRefresh', { seconds })}
+            </span>
         </>
     );
 }

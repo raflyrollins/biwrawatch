@@ -5,9 +5,14 @@ import AdminLayout from '@/layouts/admin-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import PublicLayout from '@/layouts/public-layout';
 
-configureEcho({
-    broadcaster: 'reverb',
-});
+if (typeof window !== 'undefined') {
+    const reverbHost = import.meta.env.VITE_REVERB_HOST;
+
+    configureEcho({
+        broadcaster: 'reverb',
+        ...(reverbHost === 'localhost' ? { wsHost: '127.0.0.1' } : {}),
+    });
+}
 
 const appName = import.meta.env.VITE_APP_NAME || 'Biwrawatch';
 

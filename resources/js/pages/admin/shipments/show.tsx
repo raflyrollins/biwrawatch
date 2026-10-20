@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, WhenMounted } from '@inertiajs/react';
 import { useEcho } from '@laravel/echo-react';
 import {
     CheckIcon,
@@ -10,10 +10,10 @@ import {
     PencilIcon,
     PlusIcon,
     ShieldCheckIcon,
-    TrashIcon,
     TruckIcon,
     UserIcon,
 } from '@/components/icons';
+import { ShipmentTimeline } from '@/components/shipment-timeline';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import { CalendarWidget } from '@/components/ui/calendar-widget';
@@ -52,15 +52,6 @@ export default function ShipmentShow({
         null,
     );
     const [processing, setProcessing] = useState(false);
-
-    useEcho(
-        `shipments.${shipment.uuid}`,
-        'ShipmentStatusUpdated',
-        () => {
-            router.reload({ only: ['shipment'] });
-        },
-        [shipment.uuid],
-    );
 
     const statusForm = useForm({
         status: shipment.status.value,
@@ -122,6 +113,10 @@ export default function ShipmentShow({
     return (
         <>
             <Head title={t('admin.shipments.detailTitle')} />
+
+            <WhenMounted>
+                <ShipmentRealtime uuid={shipment.uuid} />
+            </WhenMounted>
 
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                 <div>
@@ -205,247 +200,6 @@ export default function ShipmentShow({
                     </Card>
 
                     <Card className="p-5">
-                        <div className="flex items-center justify-between gap-4">
-                            <h2 className="font-display text-2xl text-foreground">
-                                {t('admin.shipments.timeline')}
-                            </h2>
-                            <span className="text-xs text-foreground-subtle">
-                                {t('admin.shipments.lastUpdate')}:{' '}
-                                {shipment.last_status_at
-                                    ? formatDateTime(shipment.last_status_at)
-                                    : '-'}
-                            </span>
-                        </div>
-
-                        {shipment.events.length > 0 ? (
-                            <ol className="mt-5 flex flex-col">
-                                {shipment.events.map((event, index) => (
-                                    <li
-                                        key={event.id}
-                                        className="group relative flex gap-4 pb-6 last:pb-0"
-                                    >
-                                        {index < shipment.events.length - 1 ? (
-                                            <span className="absolute top-4 left-[7px] h-full w-px bg-border" />
-                                        ) : null}
-                                        <span className="relative mt-1.5 size-3.5 shrink-0 rounded-pill border-2 border-surface bg-brand" />
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <p className="text-sm font-semibold text-foreground">
-                                                    {event.status.label}
-                                                </p>
-                                                {event.is_public === false ? (
-                                                    <span className="rounded-pill bg-surface-strong px-2 py-0.5 text-[10px] font-semibold text-foreground-subtle">
-                                                        Internal
-                                                    </span>
-                                                ) : null}
-                                            </div>
-                                            <p className="mt-0.5 text-xs text-foreground-subtle">
-                                                {formatDateTime(
-                                                    event.occurred_at,
-                                                )}
-                                                {event.location
-                                                    ? ` · ${event.location}`
-                                                    : ''}
-                                                {event.creator
-                                                    ? ` · ${event.creator}`
-                                                    : ''}
-                                            </p>
-                                            {event.note ? (
-                                                <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
-                                                    {event.note}
-                                                </p>
-                                            ) : null}
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                setPendingEvent(event)
-                                            }
-                                            className="inline-flex size-8 shrink-0 items-center justify-center rounded-control text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-danger-soft hover:text-danger"
-                                            aria-label={t(
-                                                'admin.shipments.deleteEvent',
-                                            )}
-                                        >
-                                            <TrashIcon className="size-3.5" />
-                                        </button>
-                                    </li>
-                                ))}
-                            </ol>
-                        ) : (
-                            <p className="mt-4 text-sm text-foreground-muted">
-                                {t('admin.shipments.noEvents')}
-                            </p>
-                        )}
-                    </Card>
-                </div>
-
-                <div className="flex flex-col gap-5">
-                    <Card className="p-5">
-                        <h2 className="text-[10px] font-semibold tracking-[0.16em] text-foreground-subtle uppercase">
-                            {t('admin.shipments.publicLink')}
-                        </h2>
-                        <div className="mt-3 flex gap-2">
-                            <Input
-                                value={public_url}
-                                readOnly
-                                className="text-xs"
-                            />
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                size="icon"
-                                onClick={copyLink}
-                                aria-label={t('admin.actions.copy')}
-                            >
-                                {copied ? (
-                                    <CheckIcon className="size-4 text-success" />
-                                ) : (
-                                    <CopyIcon className="size-4" />
-                                )}
-                            </Button>
-                        </div>
-                        <a
-                            href={public_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
-                        >
-                            {t('admin.shipments.publicTracking')}
-                            <ExternalLinkIcon className="size-3.5" />
-                        </a>
-                    </Card>
-
-                    <Card className="p-5">
-                        <h2 className="text-[10px] font-semibold tracking-[0.16em] text-foreground-subtle uppercase">
-                            {t('admin.shipments.addStatus')}
-                        </h2>
-                        <form
-                            className="mt-4 flex flex-col gap-4"
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                statusForm.patch(
-                                    `/admin/shipments/${shipment.uuid}/status`,
-                                    {
-                                        preserveScroll: true,
-                                        onSuccess: () =>
-                                            statusForm.reset(
-                                                'location',
-                                                'note',
-                                                'occurred_at',
-                                            ),
-                                    },
-                                );
-                            }}
-                        >
-                            <Field
-                                label={t('shipment.labels.status')}
-                                htmlFor="status"
-                                required
-                                error={statusForm.errors.status}
-                            >
-                                <Select
-                                    id="status"
-                                    value={statusForm.data.status}
-                                    onChange={(event) =>
-                                        statusForm.setData(
-                                            'status',
-                                            event.target.value,
-                                        )
-                                    }
-                                >
-                                    {Object.entries(statuses).map(
-                                        ([value, label]) => (
-                                            <option key={value} value={value}>
-                                                {label}
-                                            </option>
-                                        ),
-                                    )}
-                                </Select>
-                            </Field>
-                            <Field
-                                label={t('shipment.labels.location')}
-                                htmlFor="location"
-                                error={statusForm.errors.location}
-                            >
-                                <Input
-                                    id="location"
-                                    value={statusForm.data.location}
-                                    onChange={(event) =>
-                                        statusForm.setData(
-                                            'location',
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder={t(
-                                        'admin.shipments.locationPlaceholder',
-                                    )}
-                                />
-                            </Field>
-                            <Field
-                                label={t('shipment.labels.note')}
-                                htmlFor="note"
-                                error={statusForm.errors.note}
-                            >
-                                <Textarea
-                                    id="note"
-                                    value={statusForm.data.note}
-                                    onChange={(event) =>
-                                        statusForm.setData(
-                                            'note',
-                                            event.target.value,
-                                        )
-                                    }
-                                    placeholder={t(
-                                        'admin.shipments.notePlaceholder',
-                                    )}
-                                    rows={3}
-                                />
-                            </Field>
-                            <Field
-                                label={t('shipment.labels.occurred_at')}
-                                htmlFor="occurred_at"
-                                error={statusForm.errors.occurred_at}
-                            >
-                                <CalendarWidget
-                                    id="occurred_at"
-                                    mode="datetime"
-                                    value={statusForm.data.occurred_at}
-                                    onChange={(value) =>
-                                        statusForm.setData('occurred_at', value)
-                                    }
-                                    invalid={Boolean(
-                                        statusForm.errors.occurred_at,
-                                    )}
-                                />
-                            </Field>
-                            <label className="flex items-center justify-between gap-3 text-sm text-foreground">
-                                {t('shipment.labels.is_public')}
-                                <input
-                                    type="checkbox"
-                                    checked={statusForm.data.is_public}
-                                    onChange={(event) =>
-                                        statusForm.setData(
-                                            'is_public',
-                                            event.target.checked,
-                                        )
-                                    }
-                                    className="size-4 rounded border-border text-brand focus:ring-brand"
-                                />
-                            </label>
-                            <Button
-                                type="submit"
-                                isLoading={statusForm.processing}
-                                className="w-full"
-                            >
-                                {t('admin.actions.save')}
-                            </Button>
-                            <p className="text-xs leading-relaxed text-foreground-subtle">
-                                {t('admin.shipments.statusHint')}
-                            </p>
-                        </form>
-                    </Card>
-
-                    <Card className="p-5">
                         <div className="flex items-center justify-between gap-3">
                             <h2 className="text-[10px] font-semibold tracking-[0.16em] text-foreground-subtle uppercase">
                                 {t('admin.shipments.trackingHistory')}
@@ -453,7 +207,7 @@ export default function ShipmentShow({
                             <TruckIcon className="size-4 text-brand" />
                         </div>
 
-                        <div className="mt-4 flex flex-col gap-3">
+                        <div className="mt-4 flex max-h-80 flex-col gap-3 overflow-y-auto pr-1">
                             {shipment.trackings.length > 0 ? (
                                 shipment.trackings.map((tracking) => (
                                     <div
@@ -529,9 +283,193 @@ export default function ShipmentShow({
                                 </p>
                             )}
                         </div>
+                    </Card>
+                </div>
+
+                <div className="flex flex-col gap-5">
+                    <Card className="p-5">
+                        <h2 className="text-[10px] font-semibold tracking-[0.16em] text-foreground-subtle uppercase">
+                            {t('admin.shipments.publicLink')}
+                        </h2>
+                        <div className="mt-3 flex gap-2">
+                            <Input
+                                value={public_url}
+                                readOnly
+                                className="text-xs"
+                            />
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="icon"
+                                onClick={copyLink}
+                                aria-label={t('admin.actions.copy')}
+                            >
+                                {copied ? (
+                                    <CheckIcon className="size-4 text-success" />
+                                ) : (
+                                    <CopyIcon className="size-4" />
+                                )}
+                            </Button>
+                        </div>
+                        <a
+                            href={public_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
+                        >
+                            {t('admin.shipments.publicTracking')}
+                            <ExternalLinkIcon className="size-3.5" />
+                        </a>
+                    </Card>
+
+                    <Card className="p-5">
+                        <h2 className="text-[10px] font-semibold tracking-[0.16em] text-foreground-subtle uppercase">
+                            {t('admin.shipments.addStatus')}
+                        </h2>
+                        <div className="mt-4 max-h-[32rem] overflow-y-auto pr-2">
+                            <form
+                                className="flex flex-col gap-4"
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    statusForm.patch(
+                                        `/admin/shipments/${shipment.uuid}/status`,
+                                        {
+                                            preserveScroll: true,
+                                            onSuccess: () =>
+                                                statusForm.reset(
+                                                    'location',
+                                                    'note',
+                                                    'occurred_at',
+                                                ),
+                                        },
+                                    );
+                                }}
+                            >
+                                <Field
+                                    label={t('shipment.labels.status')}
+                                    htmlFor="status"
+                                    required
+                                    error={statusForm.errors.status}
+                                >
+                                    <Select
+                                        id="status"
+                                        value={statusForm.data.status}
+                                        onChange={(event) =>
+                                            statusForm.setData(
+                                                'status',
+                                                event.target.value,
+                                            )
+                                        }
+                                    >
+                                        {Object.entries(statuses).map(
+                                            ([value, label]) => (
+                                                <option
+                                                    key={value}
+                                                    value={value}
+                                                >
+                                                    {label}
+                                                </option>
+                                            ),
+                                        )}
+                                    </Select>
+                                </Field>
+                                <Field
+                                    label={t('shipment.labels.location')}
+                                    htmlFor="location"
+                                    error={statusForm.errors.location}
+                                >
+                                    <Input
+                                        id="location"
+                                        value={statusForm.data.location}
+                                        onChange={(event) =>
+                                            statusForm.setData(
+                                                'location',
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder={t(
+                                            'admin.shipments.locationPlaceholder',
+                                        )}
+                                    />
+                                </Field>
+                                <Field
+                                    label={t('shipment.labels.note')}
+                                    htmlFor="note"
+                                    error={statusForm.errors.note}
+                                >
+                                    <Textarea
+                                        id="note"
+                                        value={statusForm.data.note}
+                                        onChange={(event) =>
+                                            statusForm.setData(
+                                                'note',
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder={t(
+                                            'admin.shipments.notePlaceholder',
+                                        )}
+                                        rows={3}
+                                    />
+                                </Field>
+                                <Field
+                                    label={t('shipment.labels.occurred_at')}
+                                    htmlFor="occurred_at"
+                                    error={statusForm.errors.occurred_at}
+                                >
+                                    <CalendarWidget
+                                        id="occurred_at"
+                                        mode="datetime"
+                                        value={statusForm.data.occurred_at}
+                                        onChange={(value) =>
+                                            statusForm.setData(
+                                                'occurred_at',
+                                                value,
+                                            )
+                                        }
+                                        invalid={Boolean(
+                                            statusForm.errors.occurred_at,
+                                        )}
+                                    />
+                                </Field>
+                                <label className="flex items-center justify-between gap-3 text-sm text-foreground">
+                                    {t('shipment.labels.is_public')}
+                                    <input
+                                        type="checkbox"
+                                        checked={statusForm.data.is_public}
+                                        onChange={(event) =>
+                                            statusForm.setData(
+                                                'is_public',
+                                                event.target.checked,
+                                            )
+                                        }
+                                        className="size-4 rounded border-border text-brand focus:ring-brand"
+                                    />
+                                </label>
+                                <Button
+                                    type="submit"
+                                    isLoading={statusForm.processing}
+                                    className="w-full"
+                                >
+                                    {t('admin.actions.save')}
+                                </Button>
+                                <p className="text-xs leading-relaxed text-foreground-subtle">
+                                    {t('admin.shipments.statusHint')}
+                                </p>
+                            </form>
+                        </div>
+                    </Card>
+
+                    <Card className="p-5">
+                        <div className="flex items-center justify-between gap-3">
+                            <h2 className="text-[10px] font-semibold tracking-[0.16em] text-foreground-subtle uppercase">
+                                {t('admin.shipments.addTracking')}
+                            </h2>
+                            <TruckIcon className="size-4 text-brand" />
+                        </div>
 
                         <form
-                            className="mt-5 flex flex-col gap-4 border-t border-border pt-5"
+                            className="mt-4 flex max-h-[26rem] flex-col gap-4 overflow-y-auto pr-2"
                             onSubmit={(event) => {
                                 event.preventDefault();
                                 trackingForm.post(
@@ -547,9 +485,6 @@ export default function ShipmentShow({
                                 );
                             }}
                         >
-                            <h3 className="text-sm font-semibold text-foreground">
-                                {t('admin.shipments.addTracking')}
-                            </h3>
                             <Field
                                 label={t('shipment.labels.provider')}
                                 htmlFor="provider_id"
@@ -633,6 +568,35 @@ export default function ShipmentShow({
                 </div>
             </div>
 
+            <Card className="mt-5 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 className="font-display text-2xl text-foreground">
+                            {t('admin.shipments.timeline')}
+                        </h2>
+                        <p className="mt-1 text-xs text-foreground-subtle">
+                            {t('admin.shipments.lastUpdate')}:{' '}
+                            {shipment.last_status_at
+                                ? formatDateTime(shipment.last_status_at)
+                                : '-'}
+                        </p>
+                    </div>
+                    <span className="rounded-pill bg-surface-muted px-3 py-1 text-xs font-semibold text-foreground-muted">
+                        {t('admin.shipments.eventCount', {
+                            count: shipment.events.length,
+                        })}
+                    </span>
+                </div>
+
+                <div className="mt-4">
+                    <ShipmentTimeline
+                        events={shipment.events}
+                        emptyLabel={t('admin.shipments.noEvents')}
+                        onDelete={setPendingEvent}
+                    />
+                </div>
+            </Card>
+
             <ConfirmDialog
                 open={pendingTracking !== null}
                 onClose={() => setPendingTracking(null)}
@@ -658,6 +622,19 @@ export default function ShipmentShow({
             />
         </>
     );
+}
+
+function ShipmentRealtime({ uuid }: { uuid: string }) {
+    useEcho(
+        `shipments.${uuid}`,
+        '.ShipmentStatusUpdated',
+        () => {
+            router.reload({ only: ['shipment'] });
+        },
+        [uuid],
+    );
+
+    return null;
 }
 
 function Info({

@@ -60,6 +60,7 @@ class HandleInertiaRequests extends Middleware
                 'instagram_url' => config('site.instagram_url'),
                 'address' => config('site.address'),
                 'currency' => config('site.currency'),
+                'tracking_refresh_seconds' => config('shipping.public_refresh_seconds'),
             ],
             'flash' => [
                 'success' => fn (): ?string => $request->session()->get('success'),

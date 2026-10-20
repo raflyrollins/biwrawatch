@@ -32,6 +32,7 @@ return [
         'provider' => 'Kurir',
         'provider_tracking_number' => 'Nomor tracking kurir',
         'is_primary' => 'Jadikan tracking utama',
+        'internal' => 'Internal',
         'trackings' => 'Riwayat tracking',
         'events' => 'Riwayat status',
     ],

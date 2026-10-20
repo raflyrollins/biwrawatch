@@ -17,7 +17,7 @@ class ShipmentStatusUpdated implements ShouldBroadcast
 
     public function __construct(
         public Shipment $shipment,
-        public ShipmentEvent $event,
+        public ?ShipmentEvent $event = null,
     ) {}
 
     /**
@@ -44,8 +44,8 @@ class ShipmentStatusUpdated implements ShouldBroadcast
         return [
             'shipment_uuid' => $this->shipment->uuid,
             'tracking_number' => $this->shipment->tracking_number,
-            'status' => $this->event->status->value,
-            'occurred_at' => $this->event->occurred_at->toIso8601String(),
+            'status' => $this->event?->status->value ?? $this->shipment->status->value,
+            'occurred_at' => ($this->event->occurred_at ?? $this->shipment->last_status_at)?->toIso8601String(),
             'last_status_at' => $this->shipment->last_status_at?->toIso8601String(),
         ];
     }

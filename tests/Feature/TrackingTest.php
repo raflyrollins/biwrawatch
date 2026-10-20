@@ -27,7 +27,11 @@ test('public tracking is hidden until the recipient phone is verified', function
         ->assertInertia(fn (Assert $page) => $page
             ->component('track/show')
             ->where('verified', false)
-            ->where('shipment', null));
+            ->where('shipment', null)
+            ->where(
+                'site.tracking_refresh_seconds',
+                config('shipping.public_refresh_seconds'),
+            ));
 });
 
 test('recipient phone verification grants access to shipment timeline', function () {

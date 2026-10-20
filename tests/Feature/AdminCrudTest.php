@@ -3,10 +3,13 @@
 use App\Enums\ShipmentStatus;
 use App\Enums\WatchCondition;
 use App\Enums\WatchStatus;
+use App\Events\ShipmentStatusUpdated;
 use App\Models\Promotion;
 use App\Models\Shipment;
+use App\Models\ShipmentEvent;
 use App\Models\ShippingProvider;
 use App\Models\User;
+use Illuminate\Support\Facades\Event;
 
 function adminUser(): User
 {
@@ -101,4 +104,77 @@ test('admin can update shipment status and publish an event', function () {
 
     expect($shipment->status)->toBe(ShipmentStatus::InTransit)
         ->and($shipment->events()->where('is_public', true)->count())->toBe(1);
+});
+
+test('deleting the latest event rolls the shipment status back and broadcasts it', function () {
+    Event::fake([ShipmentStatusUpdated::class]);
+
+    $shipment = Shipment::factory()->create([
+        'status' => ShipmentStatus::Delivered,
+        'shipped_at' => now()->subDays(2),
+        'delivered_at' => now(),
+        'last_status_at' => now(),
+    ]);
+
+    ShipmentEvent::factory()->create([
+        'shipment_id' => $shipment->id,
+        'status' => ShipmentStatus::Pending,
+        'occurred_at' => now()->subDays(3),
+    ]);
+
+    $inTransit = ShipmentEvent::factory()->create([
+        'shipment_id' => $shipment->id,
+        'status' => ShipmentStatus::InTransit,
+        'occurred_at' => now()->subDays(2),
+    ]);
+
+    $delivered = ShipmentEvent::factory()->create([
+        'shipment_id' => $shipment->id,
+        'status' => ShipmentStatus::Delivered,
+        'occurred_at' => now(),
+    ]);
+
+    $this->actingAs(adminUser())
+        ->delete(route('admin.shipments.events.destroy', [$shipment, $delivered]))
+        ->assertRedirect();
+
+    $shipment->refresh();
+
+    expect($shipment->status)->toBe(ShipmentStatus::InTransit)
+        ->and($shipment->last_status_at?->equalTo($inTransit->occurred_at))->toBeTrue()
+        ->and($shipment->shipped_at?->equalTo($inTransit->occurred_at))->toBeTrue()
+        ->and($shipment->delivered_at)->toBeNull();
+
+    Event::assertDispatched(
+        ShipmentStatusUpdated::class,
+        fn (ShipmentStatusUpdated $event): bool => $event->shipment->is($shipment)
+            && $event->event === null,
+    );
+});
+
+test('deleting the final event returns the shipment to pending', function () {
+    Event::fake([ShipmentStatusUpdated::class]);
+
+    $shipment = Shipment::factory()->create([
+        'status' => ShipmentStatus::PickedUp,
+        'shipped_at' => now(),
+        'last_status_at' => now(),
+    ]);
+
+    $event = ShipmentEvent::factory()->create([
+        'shipment_id' => $shipment->id,
+        'status' => ShipmentStatus::PickedUp,
+        'occurred_at' => now(),
+    ]);
+
+    $this->actingAs(adminUser())
+        ->delete(route('admin.shipments.events.destroy', [$shipment, $event]))
+        ->assertRedirect();
+
+    $shipment->refresh();
+
+    expect($shipment->status)->toBe(ShipmentStatus::Pending)
+        ->and($shipment->last_status_at)->toBeNull()
+        ->and($shipment->shipped_at)->toBeNull()
+        ->and($shipment->delivered_at)->toBeNull();
 });
